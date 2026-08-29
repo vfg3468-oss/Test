@@ -1,8 +1,9 @@
 -- ==========================================
--- MAXU HUB PREMIUM - [ TSB MAIN ] (V30.1)
+-- MAXU HUB PREMIUM - [ TSB MAIN ] (V30.2)
 -- Fix: keo cua so muot (title bar + AbsolutePosition)
 -- Fix: xoa UI duplicate (het giat/ket)
 -- Them: nut On/Off tang hinh
+-- Fix: nut _ thu nho va X tat script khong bi de
 -- ==========================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -113,69 +114,73 @@ MainFrame.Parent = MaxuHub
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.Size = UDim2.new(1, -88, 0, 40)
 TopBar.BackgroundTransparency = 1
+TopBar.Active = true
 TopBar.Parent = MainFrame
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(0, 300, 1, 0)
+TitleText.Size = UDim2.new(1, -8, 1, 0)
 TitleText.Position = UDim2.new(0, 15, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Maxu Hub Premium [ TSB Main V30 ]"
+TitleText.Text = "Maxu Hub Premium [ TSB Main V30.2 ]"
 TitleText.TextColor3 = Color3.fromRGB(200, 200, 200)
 TitleText.Font = Enum.Font.GothamMedium
 TitleText.TextSize = 14
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
+TitleText.Active = false
 TitleText.Parent = TopBar
+MakeDraggable(TopBar, MainFrame)
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 40, 0, 40)
-CloseBtn.Position = UDim2.new(1, -40, 0, 0)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-CloseBtn.Font = Enum.Font.GothamMedium
-CloseBtn.TextSize = 16
-CloseBtn.Parent = TopBar
-table.insert(connections, CloseBtn.MouseButton1Click:Connect(function() MaxuHub:Destroy() end))
+local WinControls = Instance.new("Frame")
+WinControls.Name = "WinControls"
+WinControls.Size = UDim2.new(0, 88, 0, 40)
+WinControls.Position = UDim2.new(1, -88, 0, 0)
+WinControls.BackgroundTransparency = 1
+WinControls.ZIndex = 20
+WinControls.Parent = MainFrame
 
 local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 40, 0, 40)
-MinimizeBtn.Position = UDim2.new(1, -80, 0, 0)
+MinimizeBtn.Size = UDim2.new(0, 44, 0, 40)
+MinimizeBtn.Position = UDim2.new(0, 0, 0, 0)
 MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinimizeBtn.Text = "_"
+MinimizeBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
 MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.TextSize = 18
-MinimizeBtn.Parent = TopBar
+MinimizeBtn.ZIndex = 21
+MinimizeBtn.AutoButtonColor = true
+MinimizeBtn.Parent = WinControls
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 44, 0, 40)
+CloseBtn.Position = UDim2.new(0, 44, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 16
+CloseBtn.ZIndex = 21
+CloseBtn.AutoButtonColor = true
+CloseBtn.Parent = WinControls
+table.insert(connections, CloseBtn.MouseButton1Click:Connect(function()
+    MaxuHub:Destroy()
+end))
 
 local MiniButton = Instance.new("ImageButton")
 MiniButton.Size = UDim2.new(0, 50, 0, 50)
-MiniButton.Position = UDim2.new(0, 25, 0, 90) 
+MiniButton.Position = UDim2.new(0, 25, 0, 90)
 MiniButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MiniButton.Image = "rbxassetid://13206924887"
 MiniButton.Visible = false
 MiniButton.Active = true
+MiniButton.ZIndex = 30
 MiniButton.Parent = MaxuHub
 Instance.new("UICorner", MiniButton).CornerRadius = UDim.new(1, 0)
 local MiniStroke = Instance.new("UIStroke", MiniButton)
 MiniStroke.Color = Color3.fromRGB(0, 170, 255)
 MiniStroke.Thickness = 3
 MakeDraggable(MiniButton)
-
-local DragStrip = Instance.new("TextButton")
-DragStrip.Name = "DragStrip"
-DragStrip.Size = UDim2.new(1, -90, 1, 0)
-DragStrip.Position = UDim2.new(0, 0, 0, 0)
-DragStrip.BackgroundTransparency = 1
-DragStrip.Text = ""
-DragStrip.AutoButtonColor = false
-DragStrip.ZIndex = 2
-DragStrip.Parent = TopBar
-TitleText.ZIndex = 3
-CloseBtn.ZIndex = 4
-MinimizeBtn.ZIndex = 4
-MakeDraggable(DragStrip, MainFrame)
 
 table.insert(connections, MinimizeBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
