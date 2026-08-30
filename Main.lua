@@ -1,4 +1,4 @@
--- ==========================================
+-- -- ==========================================
 -- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V30 - SMART VOID DRAG)
 -- ==========================================
 
@@ -38,6 +38,50 @@ table.insert(connections, MaxuHub.AncestryChanged:Connect(function(_, parent)
             if conn and conn.Connected then conn:Disconnect() end
         end
         table.clear(connections)
+    end
+end))
+
+-- ==========================================
+-- DRAGGABLE HELPER (OPTIMIZED UI ONLY)
+-- ==========================================
+local activeDragTarget = nil
+local dragStartPos = Vector2.zero
+local frameStartPos = UDim2.new()
+
+local function MakeDraggable(frame)
+    table.insert(connections, frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+            activeDragTarget = frame
+            dragStartPos = input.Position
+            frameStartPos = frame.Position
+        end
+    end))
+end
+
+table.insert(connections, UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        activeDragTarget = nil
+    end
+end))
+
+table.insert(connections, UserInputService.InputChanged:Connect(function(input)
+    if not activeDragTarget then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch then
+
+        local delta = input.Position - dragStartPos
+
+        activeDragTarget.Position = UDim2.new(
+            frameStartPos.X.Scale,
+            frameStartPos.X.Offset + delta.X,
+            frameStartPos.Y.Scale,
+            frameStartPos.Y.Offset + delta.Y
+        )
     end
 end))
 -- ==========================================
