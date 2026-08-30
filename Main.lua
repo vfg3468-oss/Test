@@ -1,9 +1,10 @@
 -- ==========================================
--- MAXU HUB PREMIUM - [ TSB MAIN ] (V30.2)
+-- MAXU HUB PREMIUM - [ TSB MAIN ] (V30.3)
 -- Fix: keo cua so muot (title bar + AbsolutePosition)
 -- Fix: xoa UI duplicate (het giat/ket)
 -- Them: nut On/Off tang hinh
 -- Fix: nut _ thu nho va X tat script khong bi de
+-- V30.3: nut _ / X luon trong man hinh, icon ro, ZIndex cao, tap duoc tren mobile
 -- ==========================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -93,9 +94,18 @@ table.insert(connections, UserInputService.InputChanged:Connect(function(input)
     end
     local viewport = Camera.ViewportSize
     local size = activeDragTarget.AbsoluteSize
-    local maxX = math.max(0, viewport.X - math.min(size.X, 48))
+    -- Keep the whole window (and therefore _ / X) on-screen. If the window is
+    -- wider than the viewport, pin the RIGHT edge so window controls stay visible.
+    local maxX, minX
+    if size.X <= viewport.X then
+        minX = 0
+        maxX = viewport.X - size.X
+    else
+        minX = viewport.X - size.X
+        maxX = 0
+    end
     local maxY = math.max(0, viewport.Y - 40)
-    local finalX = math.clamp(dragStartAbs.X + delta.X, 0, maxX)
+    local finalX = math.clamp(dragStartAbs.X + delta.X, minX, math.max(minX, maxX))
     local finalY = math.clamp(dragStartAbs.Y + delta.Y, 0, maxY)
     activeDragTarget.Position = UDim2.fromOffset(math.floor(finalX + 0.5), math.floor(finalY + 0.5))
 end))
@@ -103,69 +113,146 @@ end))
 -- ==========================================
 -- GIAO DIỆN CHÍNH
 -- ==========================================
+local function getWindowSize()
+    local vp = Camera.ViewportSize
+    -- Fit inside the screen with a small margin so _ / X never sit off-screen
+    local w = math.floor(math.clamp(vp.X - 24, 300, 600))
+    local h = math.floor(math.clamp(vp.Y - 48, 280, 420))
+    return w, h
+end
+
+local winW, winH = getWindowSize()
+
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 600, 0, 420)
-MainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.fromOffset(winW, winH)
+MainFrame.Position = UDim2.fromOffset(
+    math.floor((Camera.ViewportSize.X - winW) * 0.5 + 0.5),
+    math.floor((Camera.ViewportSize.Y - winH) * 0.5 + 0.5)
+)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.ClipsDescendants = true
+MainFrame.ZIndex = 1
 MainFrame.Parent = MaxuHub
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-local TopBar = Instance.new("Frame")
-TopBar.Size = UDim2.new(1, -88, 0, 40)
-TopBar.BackgroundTransparency = 1
-TopBar.Active = true
-TopBar.Parent = MainFrame
+-- Full-width title bar (buttons live INSIDE it, right side, high ZIndex)
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+TitleBar.BorderSizePixel = 0
+TitleBar.Active = true
+TitleBar.ZIndex = 50
+TitleBar.Parent = MainFrame
+
+local TitleBarCorner = Instance.new("UICorner", TitleBar)
+TitleBarCorner.CornerRadius = UDim.new(0, 10)
+
+-- Cover the bottom corners of the title bar so only the top is rounded
+local TitleBarSquare = Instance.new("Frame")
+TitleBarSquare.Size = UDim2.new(1, 0, 0, 12)
+TitleBarSquare.Position = UDim2.new(0, 0, 1, -12)
+TitleBarSquare.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
+TitleBarSquare.BorderSizePixel = 0
+TitleBarSquare.ZIndex = 50
+TitleBarSquare.Active = false
+TitleBarSquare.Parent = TitleBar
+
+-- Drag region = title bar minus the 88px window-control cluster
+local DragHandle = Instance.new("Frame")
+DragHandle.Name = "DragHandle"
+DragHandle.Size = UDim2.new(1, -96, 1, 0)
+DragHandle.BackgroundTransparency = 1
+DragHandle.Active = true
+DragHandle.ZIndex = 51
+DragHandle.Parent = TitleBar
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -8, 1, 0)
-TitleText.Position = UDim2.new(0, 15, 0, 0)
+TitleText.Size = UDim2.new(1, -12, 1, 0)
+TitleText.Position = UDim2.new(0, 14, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Maxu Hub Premium [ TSB Main V30.2 ]"
+TitleText.Text = "Maxu Hub Premium [ TSB Main V30.3 ]"
 TitleText.TextColor3 = Color3.fromRGB(200, 200, 200)
-TitleText.Font = Enum.Font.GothamMedium
-TitleText.TextSize = 14
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.TextSize = 16
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
 TitleText.Active = false
-TitleText.Parent = TopBar
-MakeDraggable(TopBar, MainFrame)
+TitleText.ZIndex = 52
+TitleText.Parent = DragHandle
+pcall(function() TitleText.TextTruncate = Enum.TextTruncate.AtEnd end)
+pcall(function() TitleText.Interactable = false end)
+MakeDraggable(DragHandle, MainFrame)
 
+-- Window controls: last child of TitleBar, highest ZIndex, inset from UICorner
 local WinControls = Instance.new("Frame")
 WinControls.Name = "WinControls"
-WinControls.Size = UDim2.new(0, 88, 0, 40)
-WinControls.Position = UDim2.new(1, -88, 0, 0)
+WinControls.Size = UDim2.new(0, 92, 1, 0)
+WinControls.Position = UDim2.new(1, -96, 0, 0)
 WinControls.BackgroundTransparency = 1
-WinControls.ZIndex = 20
-WinControls.Parent = MainFrame
+WinControls.ZIndex = 80
+WinControls.Active = true
+WinControls.Parent = TitleBar
 
-local MinimizeBtn = Instance.new("TextButton")
-MinimizeBtn.Size = UDim2.new(0, 44, 0, 40)
-MinimizeBtn.Position = UDim2.new(0, 0, 0, 0)
-MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Text = "_"
-MinimizeBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-MinimizeBtn.Font = Enum.Font.GothamBold
-MinimizeBtn.TextSize = 18
-MinimizeBtn.ZIndex = 21
-MinimizeBtn.AutoButtonColor = true
-MinimizeBtn.Parent = WinControls
+local function makeWinBtn(xOffset, hoverColor)
+    local B = Instance.new("TextButton")
+    B.Size = UDim2.new(0, 36, 0, 28)
+    B.Position = UDim2.new(0, xOffset, 0.5, -14)
+    B.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    B.BackgroundTransparency = 0.15
+    B.Text = ""
+    B.AutoButtonColor = false
+    B.ZIndex = 81
+    B.Active = true
+    B.Parent = WinControls
+    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 6)
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 44, 0, 40)
-CloseBtn.Position = UDim2.new(0, 44, 0, 0)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
-CloseBtn.ZIndex = 21
-CloseBtn.AutoButtonColor = true
-CloseBtn.Parent = WinControls
-table.insert(connections, CloseBtn.MouseButton1Click:Connect(function()
+    table.insert(connections, B.MouseEnter:Connect(function()
+        B.BackgroundColor3 = hoverColor
+        B.BackgroundTransparency = 0
+    end))
+    table.insert(connections, B.MouseLeave:Connect(function()
+        B.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        B.BackgroundTransparency = 0.15
+    end))
+    return B
+end
+
+local MinimizeBtn = makeWinBtn(4, Color3.fromRGB(70, 70, 75))
+-- Visible minus-bar icon ( "_" glyph is almost invisible in most fonts )
+local MinIcon = Instance.new("Frame")
+MinIcon.Name = "Icon"
+MinIcon.Size = UDim2.new(0, 14, 0, 2)
+MinIcon.Position = UDim2.new(0.5, -7, 0.5, -1)
+MinIcon.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
+MinIcon.BorderSizePixel = 0
+MinIcon.ZIndex = 82
+MinIcon.Active = false
+MinIcon.Parent = MinimizeBtn
+pcall(function() MinIcon.Interactable = false end)
+
+local CloseBtn = makeWinBtn(48, Color3.fromRGB(200, 60, 60))
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.fromRGB(235, 235, 235)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 22
+
+local function bindClick(btn, fn)
+    table.insert(connections, btn.MouseButton1Click:Connect(fn))
+    -- Activated is more reliable on mobile executors / touch
+    pcall(function()
+        table.insert(connections, btn.Activated:Connect(fn))
+    end)
+end
+
+local closeDebounce = false
+bindClick(CloseBtn, function()
+    if closeDebounce then return end
+    closeDebounce = true
     MaxuHub:Destroy()
-end))
+end)
 
 local MiniButton = Instance.new("ImageButton")
 MiniButton.Size = UDim2.new(0, 50, 0, 50)
@@ -182,21 +269,41 @@ MiniStroke.Color = Color3.fromRGB(0, 170, 255)
 MiniStroke.Thickness = 3
 MakeDraggable(MiniButton)
 
-table.insert(connections, MinimizeBtn.MouseButton1Click:Connect(function()
+local minDebounce = false
+bindClick(MinimizeBtn, function()
+    if minDebounce then return end
+    minDebounce = true
     MainFrame.Visible = false
     MiniButton.Visible = true
-end))
-table.insert(connections, MiniButton.MouseButton1Click:Connect(function()
+    task.delay(0.15, function() minDebounce = false end)
+end)
+bindClick(MiniButton, function()
     if dragDidMove then return end
     MainFrame.Visible = true
     MiniButton.Visible = false
-end))
+end)
+
+-- Keep window + controls on screen if the player rotates the phone / resizes
+local function layoutWindow()
+    local w, h = getWindowSize()
+    MainFrame.Size = UDim2.fromOffset(w, h)
+    local vp = Camera.ViewportSize
+    local x = math.clamp(MainFrame.AbsolutePosition.X, math.min(0, vp.X - w), math.max(0, vp.X - w))
+    local y = math.clamp(MainFrame.AbsolutePosition.Y, 0, math.max(0, vp.Y - 40))
+    MainFrame.Position = UDim2.fromOffset(x, y)
+end
+table.insert(connections, Camera:GetPropertyChangedSignal("ViewportSize"):Connect(layoutWindow))
 
 local Container = Instance.new("Frame")
+Container.Name = "Container"
 Container.Size = UDim2.new(1, 0, 1, -40)
 Container.Position = UDim2.new(0, 0, 0, 40)
 Container.BackgroundTransparency = 1
+Container.ZIndex = 1
 Container.Parent = MainFrame
+-- Restack title bar last so _ / X always paint above Container (Sibling ZIndex)
+TitleBar.Parent = MainFrame
+WinControls.Parent = TitleBar
 
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 160, 1, 0)
