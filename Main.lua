@@ -1,10 +1,5 @@
 -- ==========================================
--- MAXU HUB PREMIUM - [ TSB MAIN ] (V30.3)
--- Fix: keo cua so muot (title bar + AbsolutePosition)
--- Fix: xoa UI duplicate (het giat/ket)
--- Them: nut On/Off tang hinh
--- Fix: nut _ thu nho va X tat script khong bi de
--- V30.3: nut _ / X luon trong man hinh, icon ro, ZIndex cao, tap duoc tren mobile
+-- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V30 - SMART VOID DRAG)
 -- ==========================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -31,9 +26,6 @@ end
 local MaxuHub = Instance.new("ScreenGui")
 MaxuHub.Name = "MaxuHubPremium"
 MaxuHub.ResetOnSpawn = false
-MaxuHub.IgnoreGuiInset = true
-MaxuHub.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-MaxuHub.DisplayOrder = 999
 MaxuHub.Parent = targetParent
 
 -- Cleanup
@@ -48,220 +40,63 @@ table.insert(connections, MaxuHub.AncestryChanged:Connect(function(_, parent)
         table.clear(connections)
     end
 end))
-
--- ==========================================
--- DRAGGABLE HELPER (V30.1 — title-bar only, AbsolutePosition, no jump)
--- ==========================================
-local activeDragTarget = nil
-local dragStartPos = Vector2.zero
-local dragStartAbs = Vector2.zero
-local dragDidMove = false
-
-local function MakeDraggable(handle, target)
-    target = target or handle
-    table.insert(connections, handle.InputBegan:Connect(function(input)
-        if input.UserInputType ~= Enum.UserInputType.MouseButton1
-            and input.UserInputType ~= Enum.UserInputType.Touch then
-            return
-        end
-        activeDragTarget = target
-        dragDidMove = false
-        dragStartPos = Vector2.new(input.Position.X, input.Position.Y)
-        dragStartAbs = target.AbsolutePosition
-
-        local inputEndedConn
-        inputEndedConn = input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                if activeDragTarget == target then
-                    activeDragTarget = nil
-                end
-                if inputEndedConn then inputEndedConn:Disconnect() end
-            end
-        end)
-        table.insert(connections, inputEndedConn)
-    end))
-end
-
-table.insert(connections, UserInputService.InputChanged:Connect(function(input)
-    if not activeDragTarget then return end
-    if input.UserInputType ~= Enum.UserInputType.MouseMovement
-        and input.UserInputType ~= Enum.UserInputType.Touch then
-        return
-    end
-    local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartPos
-    if delta.Magnitude > 4 then
-        dragDidMove = true
-    end
-    local viewport = Camera.ViewportSize
-    local size = activeDragTarget.AbsoluteSize
-    -- Keep the whole window (and therefore _ / X) on-screen. If the window is
-    -- wider than the viewport, pin the RIGHT edge so window controls stay visible.
-    local maxX, minX
-    if size.X <= viewport.X then
-        minX = 0
-        maxX = viewport.X - size.X
-    else
-        minX = viewport.X - size.X
-        maxX = 0
-    end
-    local maxY = math.max(0, viewport.Y - 40)
-    local finalX = math.clamp(dragStartAbs.X + delta.X, minX, math.max(minX, maxX))
-    local finalY = math.clamp(dragStartAbs.Y + delta.Y, 0, maxY)
-    activeDragTarget.Position = UDim2.fromOffset(math.floor(finalX + 0.5), math.floor(finalY + 0.5))
-end))
-
 -- ==========================================
 -- GIAO DIỆN CHÍNH
 -- ==========================================
-local function getWindowSize()
-    local vp = Camera.ViewportSize
-    -- Fit inside the screen with a small margin so _ / X never sit off-screen
-    local w = math.floor(math.clamp(vp.X - 24, 300, 600))
-    local h = math.floor(math.clamp(vp.Y - 48, 280, 420))
-    return w, h
-end
-
-local winW, winH = getWindowSize()
-
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.fromOffset(winW, winH)
-MainFrame.Position = UDim2.fromOffset(
-    math.floor((Camera.ViewportSize.X - winW) * 0.5 + 0.5),
-    math.floor((Camera.ViewportSize.Y - winH) * 0.5 + 0.5)
-)
+MainFrame.Size = UDim2.new(0, 600, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.ClipsDescendants = true
-MainFrame.ZIndex = 1
 MainFrame.Parent = MaxuHub
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+MakeDraggable(MainFrame)
 
--- Full-width title bar (buttons live INSIDE it, right side, high ZIndex)
-local TitleBar = Instance.new("Frame")
-TitleBar.Name = "TitleBar"
-TitleBar.Size = UDim2.new(1, 0, 0, 40)
-TitleBar.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
-TitleBar.BorderSizePixel = 0
-TitleBar.Active = true
-TitleBar.ZIndex = 50
-TitleBar.Parent = MainFrame
-
-local TitleBarCorner = Instance.new("UICorner", TitleBar)
-TitleBarCorner.CornerRadius = UDim.new(0, 10)
-
--- Cover the bottom corners of the title bar so only the top is rounded
-local TitleBarSquare = Instance.new("Frame")
-TitleBarSquare.Size = UDim2.new(1, 0, 0, 12)
-TitleBarSquare.Position = UDim2.new(0, 0, 1, -12)
-TitleBarSquare.BackgroundColor3 = Color3.fromRGB(32, 32, 32)
-TitleBarSquare.BorderSizePixel = 0
-TitleBarSquare.ZIndex = 50
-TitleBarSquare.Active = false
-TitleBarSquare.Parent = TitleBar
-
--- Drag region = title bar minus the 88px window-control cluster
-local DragHandle = Instance.new("Frame")
-DragHandle.Name = "DragHandle"
-DragHandle.Size = UDim2.new(1, -96, 1, 0)
-DragHandle.BackgroundTransparency = 1
-DragHandle.Active = true
-DragHandle.ZIndex = 51
-DragHandle.Parent = TitleBar
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 40)
+TopBar.BackgroundTransparency = 1
+TopBar.Parent = MainFrame
 
 local TitleText = Instance.new("TextLabel")
-TitleText.Size = UDim2.new(1, -12, 1, 0)
-TitleText.Position = UDim2.new(0, 14, 0, 0)
+TitleText.Size = UDim2.new(0, 300, 1, 0)
+TitleText.Position = UDim2.new(0, 15, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Maxu Hub Premium [ TSB Main V30.3 ]"
+TitleText.Text = "Maxu Hub Premium [ TSB Main V30 ]"
 TitleText.TextColor3 = Color3.fromRGB(200, 200, 200)
-TitleText.Font = Enum.Font.SourceSansBold
-TitleText.TextSize = 16
+TitleText.Font = Enum.Font.GothamMedium
+TitleText.TextSize = 14
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
-TitleText.Active = false
-TitleText.ZIndex = 52
-TitleText.Parent = DragHandle
-pcall(function() TitleText.TextTruncate = Enum.TextTruncate.AtEnd end)
-pcall(function() TitleText.Interactable = false end)
-MakeDraggable(DragHandle, MainFrame)
+TitleText.Parent = TopBar
 
--- Window controls: last child of TitleBar, highest ZIndex, inset from UICorner
-local WinControls = Instance.new("Frame")
-WinControls.Name = "WinControls"
-WinControls.Size = UDim2.new(0, 92, 1, 0)
-WinControls.Position = UDim2.new(1, -96, 0, 0)
-WinControls.BackgroundTransparency = 1
-WinControls.ZIndex = 80
-WinControls.Active = true
-WinControls.Parent = TitleBar
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 40, 0, 40)
+CloseBtn.Position = UDim2.new(1, -40, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+CloseBtn.Font = Enum.Font.GothamMedium
+CloseBtn.TextSize = 16
+CloseBtn.Parent = TopBar
+table.insert(connections, CloseBtn.MouseButton1Click:Connect(function() MaxuHub:Destroy() end))
 
-local function makeWinBtn(xOffset, hoverColor)
-    local B = Instance.new("TextButton")
-    B.Size = UDim2.new(0, 36, 0, 28)
-    B.Position = UDim2.new(0, xOffset, 0.5, -14)
-    B.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    B.BackgroundTransparency = 0.15
-    B.Text = ""
-    B.AutoButtonColor = false
-    B.ZIndex = 81
-    B.Active = true
-    B.Parent = WinControls
-    Instance.new("UICorner", B).CornerRadius = UDim.new(0, 6)
-
-    table.insert(connections, B.MouseEnter:Connect(function()
-        B.BackgroundColor3 = hoverColor
-        B.BackgroundTransparency = 0
-    end))
-    table.insert(connections, B.MouseLeave:Connect(function()
-        B.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        B.BackgroundTransparency = 0.15
-    end))
-    return B
-end
-
-local MinimizeBtn = makeWinBtn(4, Color3.fromRGB(70, 70, 75))
--- Visible minus-bar icon ( "_" glyph is almost invisible in most fonts )
-local MinIcon = Instance.new("Frame")
-MinIcon.Name = "Icon"
-MinIcon.Size = UDim2.new(0, 14, 0, 2)
-MinIcon.Position = UDim2.new(0.5, -7, 0.5, -1)
-MinIcon.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-MinIcon.BorderSizePixel = 0
-MinIcon.ZIndex = 82
-MinIcon.Active = false
-MinIcon.Parent = MinimizeBtn
-pcall(function() MinIcon.Interactable = false end)
-
-local CloseBtn = makeWinBtn(48, Color3.fromRGB(200, 60, 60))
-CloseBtn.Text = "×"
-CloseBtn.TextColor3 = Color3.fromRGB(235, 235, 235)
-CloseBtn.Font = Enum.Font.SourceSansBold
-CloseBtn.TextSize = 22
-
-local function bindClick(btn, fn)
-    table.insert(connections, btn.MouseButton1Click:Connect(fn))
-    -- Activated is more reliable on mobile executors / touch
-    pcall(function()
-        table.insert(connections, btn.Activated:Connect(fn))
-    end)
-end
-
-local closeDebounce = false
-bindClick(CloseBtn, function()
-    if closeDebounce then return end
-    closeDebounce = true
-    MaxuHub:Destroy()
-end)
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 40, 0, 40)
+MinimizeBtn.Position = UDim2.new(1, -80, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 18
+MinimizeBtn.Parent = TopBar
 
 local MiniButton = Instance.new("ImageButton")
 MiniButton.Size = UDim2.new(0, 50, 0, 50)
-MiniButton.Position = UDim2.new(0, 25, 0, 90)
+MiniButton.Position = UDim2.new(0, 25, 0, 90) 
 MiniButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MiniButton.Image = "rbxassetid://13206924887"
 MiniButton.Visible = false
 MiniButton.Active = true
-MiniButton.ZIndex = 30
 MiniButton.Parent = MaxuHub
 Instance.new("UICorner", MiniButton).CornerRadius = UDim.new(1, 0)
 local MiniStroke = Instance.new("UIStroke", MiniButton)
@@ -269,41 +104,14 @@ MiniStroke.Color = Color3.fromRGB(0, 170, 255)
 MiniStroke.Thickness = 3
 MakeDraggable(MiniButton)
 
-local minDebounce = false
-bindClick(MinimizeBtn, function()
-    if minDebounce then return end
-    minDebounce = true
-    MainFrame.Visible = false
-    MiniButton.Visible = true
-    task.delay(0.15, function() minDebounce = false end)
-end)
-bindClick(MiniButton, function()
-    if dragDidMove then return end
-    MainFrame.Visible = true
-    MiniButton.Visible = false
-end)
-
--- Keep window + controls on screen if the player rotates the phone / resizes
-local function layoutWindow()
-    local w, h = getWindowSize()
-    MainFrame.Size = UDim2.fromOffset(w, h)
-    local vp = Camera.ViewportSize
-    local x = math.clamp(MainFrame.AbsolutePosition.X, math.min(0, vp.X - w), math.max(0, vp.X - w))
-    local y = math.clamp(MainFrame.AbsolutePosition.Y, 0, math.max(0, vp.Y - 40))
-    MainFrame.Position = UDim2.fromOffset(x, y)
-end
-table.insert(connections, Camera:GetPropertyChangedSignal("ViewportSize"):Connect(layoutWindow))
+table.insert(connections, MinimizeBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false MiniButton.Visible = true end))
+table.insert(connections, MiniButton.MouseButton1Click:Connect(function() MainFrame.Visible = true MiniButton.Visible = false end))
 
 local Container = Instance.new("Frame")
-Container.Name = "Container"
 Container.Size = UDim2.new(1, 0, 1, -40)
 Container.Position = UDim2.new(0, 0, 0, 40)
 Container.BackgroundTransparency = 1
-Container.ZIndex = 1
 Container.Parent = MainFrame
--- Restack title bar last so _ / X always paint above Container (Sibling ZIndex)
-TitleBar.Parent = MainFrame
-WinControls.Parent = TitleBar
 
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 160, 1, 0)
@@ -484,8 +292,7 @@ local Config = {
     WalkSpeedToggle = false,
     AutoEscape = false,
     EscapeHP = 35,
-    VoidDrag = false,
-    Invisibility = false
+    VoidDrag = false
 }
 
 -- BẮT SỰ KIỆN XÀI SKILL CỦA BẢN THÂN
@@ -526,11 +333,6 @@ CreateSlider("Mốc % Máu Tẩu Thoát", 5, 90, 35, function(val) Config.Escape
 CreateHeader("Player Buffs")
 CreateToggle("Bật WalkSpeed", function(state) Config.WalkSpeedToggle = state end)
 CreateSlider("Tốc độ chạy", 1, 300, 16, function(val) Config.WalkSpeed = val end)
-
-CreateHeader("Tàng hình")
-CreateToggle("Bật tàng hình (Invisibility)", function(state)
-    Config.Invisibility = state
-end)
 
 CreateHeader("Targeting")
 local TargetLabel = Instance.new("TextLabel")
@@ -755,6 +557,283 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         end
     end
 end))
+
+-- ==========================================
+-- CẤU HÌNH & BIẾN GLOBAL
+-- ==========================================
+local Config = {
+    Target = nil,
+    StickyTele = false,
+    TeleDistance = 3, 
+    CharAim = false,
+    AutoSelect = false,
+    AntiFling = false,
+    WalkSpeed = 16,
+    WalkSpeedToggle = false,
+    AutoEscape = false,
+    EscapeHP = 35,
+    VoidDrag = false
+}
+
+-- BẮT SỰ KIỆN XÀI SKILL CỦA BẢN THÂN
+local isCastingSkill = false
+table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+       input.KeyCode == Enum.KeyCode.One or
+       input.KeyCode == Enum.KeyCode.Two or
+       input.KeyCode == Enum.KeyCode.Three or
+       input.KeyCode == Enum.KeyCode.Four then
+       
+        isCastingSkill = true
+        task.delay(1.5, function()
+            isCastingSkill = false
+        end)
+    end
+end))
+
+CreateHeader("Combat Pro")
+CreateToggle("Bay Dí Sát / Tele Kill", function(state) Config.StickyTele = state end)
+CreateToggle("Void Drag (CHỈ KHI DÙNG SKILL/M1)", function(state) Config.VoidDrag = state end)
+CreateToggle("Tự động chọn Target mới", function(state) Config.AutoSelect = state end)
+CreateSlider("Khoảng cách sau lưng", 1, 15, 3, function(val) Config.TeleDistance = val end)
+CreateToggle("Aim Nhân Vật (Auto Face)", function(state) Config.CharAim = state end)
+CreateToggle("Chống Fling (Anti-Fling)", function(state) Config.AntiFling = state end)
+CreateToggle("Tự động tẩu thoát khi yếu máu", function(state) 
+    Config.AutoEscape = state 
+    if not state and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.Anchored = false
+    end
+end)
+CreateSlider("Mốc % Máu Tẩu Thoát", 5, 90, 35, function(val) Config.EscapeHP = val end)
+
+CreateHeader("Player Buffs")
+CreateToggle("Bật WalkSpeed", function(state) Config.WalkSpeedToggle = state end)
+CreateSlider("Tốc độ chạy", 1, 300, 16, function(val) Config.WalkSpeed = val end)
+
+CreateHeader("Targeting")
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(1, -10, 0, 25)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Target: CHƯA CHỌN"
+TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+TargetLabel.Font = Enum.Font.GothamBold
+TargetLabel.TextSize = 14
+TargetLabel.Parent = ContentFrame
+
+local RefreshBtn = Instance.new("TextButton")
+RefreshBtn.Size = UDim2.new(1, -10, 0, 35)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+RefreshBtn.Text = "Làm mới danh sách Player"
+RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RefreshBtn.Font = Enum.Font.GothamBold
+RefreshBtn.TextSize = 14
+RefreshBtn.Parent = ContentFrame
+Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 6)
+
+local PlayerListFrame = Instance.new("Frame")
+PlayerListFrame.Size = UDim2.new(1, -10, 0, 0)
+PlayerListFrame.AutomaticSize = Enum.AutomaticSize.Y
+PlayerListFrame.BackgroundTransparency = 1
+PlayerListFrame.Parent = ContentFrame
+local PlayerListLay = Instance.new("UIListLayout", PlayerListFrame)
+PlayerListLay.Padding = UDim.new(0, 4)
+
+local playerButtonConnections = {}
+
+local function RefreshPlayers()
+    for _, conn in ipairs(playerButtonConnections) do
+        if conn and conn.Connected then conn:Disconnect() end
+    end
+    table.clear(playerButtonConnections)
+    for _, child in ipairs(PlayerListFrame:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local pBtn = Instance.new("TextButton")
+            pBtn.Size = UDim2.new(1, 0, 0, 30)
+            pBtn.BackgroundColor3 = (Config.Target == p) and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 45)
+            pBtn.Text = p.Name
+            pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            pBtn.Font = Enum.Font.GothamMedium
+            pBtn.TextSize = 13
+            pBtn.Parent = PlayerListFrame
+            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
+            
+            local btnConn = pBtn.MouseButton1Click:Connect(function()
+                if Config.Target == p then 
+                    Config.Target = nil 
+                    TargetLabel.Text = "Target: CHƯA CHỌN" 
+                    TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80) 
+                    pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+                else 
+                    Config.Target = p 
+                    TargetLabel.Text = "Target: " .. p.Name 
+                    TargetLabel.TextColor3 = Color3.fromRGB(80, 255, 80) 
+                    for _, b in ipairs(PlayerListFrame:GetChildren()) do
+                        if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(40, 40, 45) end
+                    end
+                    pBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255) 
+                end
+            end)
+            table.insert(playerButtonConnections, btnConn)
+            table.insert(connections, btnConn)
+        end
+    end
+end
+table.insert(connections, RefreshBtn.MouseButton1Click:Connect(RefreshPlayers))
+RefreshPlayers()
+
+local function FindNewTarget()
+    local closestPlayer = nil
+    local shortestDist = math.huge
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local tHum = p.Character:FindFirstChildOfClass("Humanoid")
+            local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
+            if tHum and tHum.Health > 0 and tHrp then
+                local dist = (tHrp.Position - hrp.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    closestPlayer = p
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+table.insert(connections, RunService.Stepped:Connect(function()
+    if Config.AntiFling then
+        local char = LocalPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp and not hrp.Anchored then
+                if hrp.AssemblyLinearVelocity.Magnitude > 300 or hrp.AssemblyAngularVelocity.Magnitude > 300 then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end
+            end
+        end
+    end
+end))
+
+-- ==========================================
+-- MAIN LOGIC LOOP 
+-- ==========================================
+local hasEscapedForLowHP = false
+local escapeTargetPos = nil
+
+table.insert(connections, RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    
+    if not hum or not hrp or hum.Health <= 0 then 
+        if hrp then hrp.Anchored = false end
+        hasEscapedForLowHP = false
+        return 
+    end
+    
+    if Config.WalkSpeedToggle and hum.WalkSpeed ~= Config.WalkSpeed then 
+        hum.WalkSpeed = Config.WalkSpeed 
+    end
+    
+    local hpPercent = (hum.Health / hum.MaxHealth) * 100
+    
+    if Config.AutoEscape and hpPercent <= Config.EscapeHP then
+        if not hasEscapedForLowHP then
+            hasEscapedForLowHP = true
+            escapeTargetPos = Vector3.new(hrp.Position.X, hrp.Position.Y + 300, hrp.Position.Z)
+        end
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BodyMover") or v:IsA("LinearVelocity") or v:IsA("VectorForce") or v:IsA("AlignPosition") then
+                v:Destroy()
+            end
+        end
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        hrp.Anchored = true
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        char:PivotTo(CFrame.new(escapeTargetPos))
+        return
+    end
+    
+    if hasEscapedForLowHP then
+        if hpPercent >= (Config.EscapeHP + 15) then
+            hasEscapedForLowHP = false
+            hrp.Anchored = false
+        else
+            char:PivotTo(CFrame.new(escapeTargetPos))
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            return
+        end
+    end
+
+    local targetInvalid = false
+    if not Config.Target or not Config.Target.Parent then
+        targetInvalid = true
+    end
+    
+    if targetInvalid then
+        if Config.AutoSelect then
+            Config.Target = FindNewTarget()
+            if Config.Target then
+                TargetLabel.Text = "Target: " .. Config.Target.Name
+                TargetLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+            else
+                TargetLabel.Text = "Target: CHƯA CHỌN"
+                TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            end
+        else
+            Config.Target = nil
+            TargetLabel.Text = "Target: CHƯA CHỌN"
+            TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        end
+    end
+    
+    if Config.Target and Config.Target.Character then
+        local tHum = Config.Target.Character:FindFirstChildOfClass("Humanoid")
+        local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
+        
+        if tHum and tHum.Health > 0 and tHrp then
+            -- NẾU ĐANG BẬT VOID DRAG VÀ ĐANG BẤM DÙNG SKILL
+            if Config.VoidDrag and isCastingSkill then
+                -- Ép địch xuống vực sâu
+                tHrp.CFrame = CFrame.new(tHrp.Position.X, -1000, tHrp.Position.Z)
+                tHrp.AssemblyLinearVelocity = Vector3.zero
+                
+                -- Mày phải ở đủ gần trục X/Z của nó để không bị mất Network Ownership
+                local safeY = math.max(hrp.Position.Y, 15)
+                hrp.CFrame = CFrame.new(tHrp.Position.X, safeY, tHrp.Position.Z)
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                
+            -- CÒN NẾU KHÔNG THÌ CHẠY TELE KILL NHƯ BÌNH THƯỜNG
+            elseif Config.StickyTele then
+                local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
+                hrp.CFrame = targetBehindCFrame
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                
+            elseif Config.CharAim then
+                local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHrp.Position.Z)
+                hrp.CFrame = CFrame.lookAt(hrp.Position, lookVector)
+            end
+        end
+    end
+end))
+
 
 -- ==========================================
 -- SCRIPT PHẦN 2 (BYPASS, ANTI-MOVES, INVISIBILITY, ETC)
@@ -1893,11 +1972,7 @@ local function startInvisibility()
 end
 
 local _invisDesyncHeartbeatConn = RunService.Heartbeat:Connect(function()
-    if Config.Invisibility and not InvisibilityActive then
-        startInvisibility()
-    elseif (not Config.Invisibility) and InvisibilityActive then
-        stopInvisibility()
-    end
+    if not farmEnabled then return end
     if isUlting or isUsingTF then getgenv().desync = nil end
     local hasDesync      = getgenv().desync ~= nil
     if not InvisibilityActive and not hasDesync then return end
@@ -1997,16 +2072,7 @@ local _invisDesyncHeartbeatConn = RunService.Heartbeat:Connect(function()
     invisBusy = false
 end)
 
-lp.CharacterAdded:Connect(function()
-    if not Config.Invisibility then return end
-    task.wait(0.3)
-    if InvisibilityActive then
-        stopInvisibility()
-    end
-    if Config.Invisibility then
-        startInvisibility()
-    end
-end)
+startInvisibility()
 
 task.spawn(function()
     local function _initDesyncEffects(char)
