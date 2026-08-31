@@ -493,12 +493,18 @@ table.insert(connections, RunService.Stepped:Connect(function()
 end))
 
 -- ==========================================
--- MAIN LOGIC LOOP 
+-- MAIN LOGIC LOOP (ĐÃ SỬA AUTO TARGET & MAX FPS)
 -- ==========================================
+-- Mở khóa FPS tối đa theo thiết bị
+pcall(function()
+    if setfpscap then setfpscap(0) end
+end)
+
 local hasEscapedForLowHP = false
 local escapeTargetPos = nil
 
-table.insert(connections, RunService.Heartbeat:Connect(function()
+-- Chuyển sang RenderStepped để đẩy tốc độ dí mục tiêu (bay cực đại) và bám siêu mượt
+table.insert(connections, RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     
@@ -547,16 +553,17 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         end
     end
 
-    local targetInvalid = false
-    if not Config.Target or not Config.Target.Character then
-        targetInvalid = true
-    else
-        local targetHum = Config.Target.Character:FindFirstChildOfClass("Humanoid")
-        if not targetHum or targetHum.Health <= 0 then targetInvalid = true end
-    end
-    
-    if targetInvalid then
-        if Config.AutoSelect then
+    -- LOGIC GHIM BẢNG & TỰ NHẬN DIỆN HỒI SINH
+    if Config.AutoSelect then
+        local needNewTarget = false
+        if not Config.Target or not Config.Target.Character then
+            needNewTarget = true
+        else
+            local targetHum = Config.Target.Character:FindFirstChildOfClass("Humanoid")
+            if not targetHum or targetHum.Health <= 0 then needNewTarget = true end
+        end
+        
+        if needNewTarget then
             Config.Target = FindNewTarget()
             if Config.Target then
                 TargetLabel.Text = "Target: " .. Config.Target.Name
@@ -565,30 +572,34 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                 TargetLabel.Text = "Target: CHƯA CHỌN"
                 TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
             end
-        else
-            Config.Target = nil
+        end
+    else
+        -- Nếu ghim tay, giữ nguyên Target khi họ chết. Chỉ cập nhật lại hiển thị UI.
+        if not Config.Target then
             TargetLabel.Text = "Target: CHƯA CHỌN"
             TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        else
+            TargetLabel.Text = "Target (Ghim): " .. Config.Target.Name
+            TargetLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
         end
     end
     
+    -- XỬ LÝ BAY ĐẾN MỤC TIÊU
     if Config.Target and Config.Target.Character then
+        local tHum = Config.Target.Character:FindFirstChildOfClass("Humanoid")
         local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
         
-        if tHrp then
-            -- NẾU ĐANG BẬT VOID DRAG VÀ ĐANG BẤM DÙNG SKILL
+        -- Chỉ dí theo nếu mục tiêu đã tải xong model và còn sống (tránh lỗi kẹt cframe)
+        if tHrp and tHum and tHum.Health > 0 then
             if Config.VoidDrag and isCastingSkill then
-                -- Ép địch xuống vực sâu
                 tHrp.CFrame = CFrame.new(tHrp.Position.X, -1000, tHrp.Position.Z)
                 tHrp.AssemblyLinearVelocity = Vector3.zero
                 
-                -- Mày phải ở đủ gần trục X/Z của nó để không bị mất Network Ownership
                 local safeY = math.max(hrp.Position.Y, 15)
                 hrp.CFrame = CFrame.new(tHrp.Position.X, safeY, tHrp.Position.Z)
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
                 
-            -- CÒN NẾU KHÔNG THÌ CHẠY TELE KILL NHƯ BÌNH THƯỜNG
             elseif Config.StickyTele then
                 local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
                 hrp.CFrame = targetBehindCFrame
