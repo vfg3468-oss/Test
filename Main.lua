@@ -52,7 +52,6 @@ local function MakeDraggable(frame)
     table.insert(connections, frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
-
             activeDragTarget = frame
             dragStartPos = input.Position
             frameStartPos = frame.Position
@@ -63,7 +62,6 @@ end
 table.insert(connections, UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
-
         activeDragTarget = nil
     end
 end))
@@ -73,9 +71,7 @@ table.insert(connections, UserInputService.InputChanged:Connect(function(input)
 
     if input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch then
-
         local delta = input.Position - dragStartPos
-
         activeDragTarget.Position = UDim2.new(
             frameStartPos.X.Scale,
             frameStartPos.X.Offset + delta.X,
@@ -345,7 +341,6 @@ local isCastingSkill = false
 table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
-    -- Nếu bấm Click Trái (M1) hoặc các nút skill 1, 2, 3, 4
     if input.UserInputType == Enum.UserInputType.MouseButton1 or
        input.KeyCode == Enum.KeyCode.One or
        input.KeyCode == Enum.KeyCode.Two or
@@ -353,7 +348,6 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input, ga
        input.KeyCode == Enum.KeyCode.Four then
        
         isCastingSkill = true
-        -- Void Drag chỉ kích hoạt trong 1.5 giây sau khi bấm xài chiêu
         task.delay(1.5, function()
             isCastingSkill = false
         end)
@@ -361,7 +355,7 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input, ga
 end))
 
 CreateHeader("Combat Pro")
-CreateToggle("Bay Dí Sát / Tele Kill", function(state) Config.StickyTele = state end)
+CreateToggle("Bay Dí Sát / Bay Cực Nhanh", function(state) Config.StickyTele = state end)
 CreateToggle("Void Drag (CHỈ KHI DÙNG SKILL/M1)", function(state) Config.VoidDrag = state end)
 CreateToggle("Tự động chọn Target mới", function(state) Config.AutoSelect = state end)
 CreateSlider("Khoảng cách sau lưng", 1, 15, 3, function(val) Config.TeleDistance = val end)
@@ -576,22 +570,23 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
         
         if tHrp then
-            -- NẾU ĐANG BẬT VOID DRAG VÀ ĐANG BẤM DÙNG SKILL
             if Config.VoidDrag and isCastingSkill then
-                -- Ép địch xuống vực sâu
                 tHrp.CFrame = CFrame.new(tHrp.Position.X, -1000, tHrp.Position.Z)
                 tHrp.AssemblyLinearVelocity = Vector3.zero
                 
-                -- Mày phải ở đủ gần trục X/Z của nó để không bị mất Network Ownership
                 local safeY = math.max(hrp.Position.Y, 15)
                 hrp.CFrame = CFrame.new(tHrp.Position.X, safeY, tHrp.Position.Z)
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
                 
-            -- CÒN NẾU KHÔNG THÌ CHẠY TELE KILL NHƯ BÌNH THƯỜNG
             elseif Config.StickyTele then
+                -- Đổi logic từ dịch chuyển tức thì sang bay mượt cực nhanh bằng Lerp
                 local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
-                hrp.CFrame = targetBehindCFrame
+                
+                -- Tạo nội suy (Lerp) với thông số 0.35 (rất nhanh nhưng không xung đột khung hình)
+                hrp.CFrame = hrp.CFrame:Lerp(targetBehindCFrame, 0.35)
+                
+                -- Vô hiệu hóa vận tốc tự do để tránh văng nhân vật
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
                 
