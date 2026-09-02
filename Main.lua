@@ -1,3 +1,4 @@
+
 -- ==========================================
 -- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V30 - SMART VOID DRAG)
 -- ==========================================
@@ -13,6 +14,15 @@ local Camera = workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local connections = {}
+
+-- Danh sách các điểm tẩu thoát (sẽ tele tuần tự qua từng điểm)
+local path = {
+    Vector3.new(-74.6, 84.0, 20352.1),
+    Vector3.new(-74.6, 84.0, 20352.1),
+    Vector3.new(-74.6, 84.0, 20352.1),
+    Vector3.new(-74.6, 84.0, 20352.1)
+}
+local pathIndex = 1
 
 -- Safe gethui
 local targetParent
@@ -42,7 +52,7 @@ table.insert(connections, MaxuHub.AncestryChanged:Connect(function(_, parent)
 end))
 
 -- ==========================================
--- DRAGGABLE HELPER (OPTIMIZED UI ONLY)
+-- DRAGGABLE HELPER
 -- ==========================================
 local activeDragTarget = nil
 local dragStartPos = Vector2.zero
@@ -50,38 +60,30 @@ local frameStartPos = UDim2.new()
 
 local function MakeDraggable(frame)
     table.insert(connections, frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             activeDragTarget = frame
             dragStartPos = input.Position
             frameStartPos = frame.Position
+            
+            local inputEndedConn
+            inputEndedConn = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    if activeDragTarget == frame then activeDragTarget = nil end
+                    if inputEndedConn then inputEndedConn:Disconnect() end
+                end
+            end)
+            table.insert(connections, inputEndedConn)
         end
     end))
 end
 
-table.insert(connections, UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-    or input.UserInputType == Enum.UserInputType.Touch then
-
-        activeDragTarget = nil
-    end
-end))
-
 table.insert(connections, UserInputService.InputChanged:Connect(function(input)
-    if not activeDragTarget then return end
-
-    if input.UserInputType == Enum.UserInputType.MouseMovement
-    or input.UserInputType == Enum.UserInputType.Touch then
-
+    if activeDragTarget and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStartPos
-
-        activeDragTarget.Position = UDim2.new(
-            frameStartPos.X.Scale,
-            frameStartPos.X.Offset + delta.X,
-            frameStartPos.Y.Scale,
-            frameStartPos.Y.Offset + delta.Y
-        )
+        local viewport = Camera.ViewportSize
+        local finalX = math.clamp(frameStartPos.X.Offset + delta.X, 0, viewport.X - 50)
+        local finalY = math.clamp(frameStartPos.Y.Offset + delta.Y, 0, viewport.Y - 50)
+        activeDragTarget.Position = UDim2.new(frameStartPos.X.Scale, finalX, frameStartPos.Y.Scale, finalY)
     end
 end))
 
@@ -340,33 +342,7 @@ local Config = {
     VoidDrag = false
 }
 
-local SAFE_SPOT = Vector3.new(-74.6, 84.0, 20352.1)
-local hasEscapedForLowHP = false
-local escapeTargetPos = SAFE_SPOT
-local telePausedForEscape = false
-local savedStickyTele = false
-local savedVoidDrag = false
-
-local function PauseTeleForEscape()
-    if telePausedForEscape then return end
-    telePausedForEscape = true
-    savedStickyTele = Config.StickyTele
-    savedVoidDrag = Config.VoidDrag
-    Config.StickyTele = false
-    Config.VoidDrag = false
-end
-
-local function ResumeTeleAfterEscape()
-    if not telePausedForEscape then return end
-    task.delay(0.2, function()
-        if telePausedForEscape and not hasEscapedForLowHP then
-            Config.StickyTele = savedStickyTele
-            Config.VoidDrag = savedVoidDrag
-            telePausedForEscape = false
-        end
-    end)
-end
-
+-- BẮT SỰ KIỆN XÀI SKILL CỦA BẢN THÂN
 local isCastingSkill = false
 table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -385,34 +361,16 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input, ga
 end))
 
 CreateHeader("Combat Pro")
-CreateToggle("Bay Dí Sát / Tele Kill", function(state)
-    if telePausedForEscape then
-        savedStickyTele = state
-        Config.StickyTele = false
-    else
-        Config.StickyTele = state
-    end
-end)
-CreateToggle("Void Drag (CHỈ KHI DÙNG SKILL/M1)", function(state)
-    if telePausedForEscape then
-        savedVoidDrag = state
-        Config.VoidDrag = false
-    else
-        Config.VoidDrag = state
-    end
-end)
+CreateToggle("Bay Dí Sát / Tele Kill", function(state) Config.StickyTele = state end)
+CreateToggle("Void Drag (CHỈ KHI DÙNG SKILL/M1)", function(state) Config.VoidDrag = state end)
 CreateToggle("Tự động chọn Target mới", function(state) Config.AutoSelect = state end)
 CreateSlider("Khoảng cách sau lưng", 1, 15, 3, function(val) Config.TeleDistance = val end)
 CreateToggle("Aim Nhân Vật (Auto Face)", function(state) Config.CharAim = state end)
 CreateToggle("Chống Fling (Anti-Fling)", function(state) Config.AntiFling = state end)
 CreateToggle("Tự động tẩu thoát khi yếu máu", function(state) 
     Config.AutoEscape = state 
-    if not state then
-        hasEscapedForLowHP = false
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.Anchored = false
-        end
-        ResumeTeleAfterEscape()
+    if not state and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        LocalPlayer.Character.HumanoidRootPart.Anchored = false
     end
 end)
 CreateSlider("Mốc % Máu Tẩu Thoát", 5, 90, 35, function(val) Config.EscapeHP = val end)
@@ -425,7 +383,7 @@ CreateHeader("Targeting")
 local TargetLabel = Instance.new("TextLabel")
 TargetLabel.Size = UDim2.new(1, -10, 0, 25)
 TargetLabel.BackgroundTransparency = 1
-TargetLabel.Text = "Target: CHƯA CHỌN  |  Tự quét danh sách"
+TargetLabel.Text = "Target: CHƯA CHỌN"
 TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
 TargetLabel.Font = Enum.Font.GothamBold
 TargetLabel.TextSize = 14
@@ -434,10 +392,10 @@ TargetLabel.Parent = ContentFrame
 local RefreshBtn = Instance.new("TextButton")
 RefreshBtn.Size = UDim2.new(1, -10, 0, 35)
 RefreshBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-RefreshBtn.Text = "Tự quét Player (đang bật) — bấm để làm mới ngay"
+RefreshBtn.Text = "Làm mới danh sách Player"
 RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 RefreshBtn.Font = Enum.Font.GothamBold
-RefreshBtn.TextSize = 13
+RefreshBtn.TextSize = 14
 RefreshBtn.Parent = ContentFrame
 Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 6)
 
@@ -450,40 +408,8 @@ local PlayerListLay = Instance.new("UIListLayout", PlayerListFrame)
 PlayerListLay.Padding = UDim.new(0, 4)
 
 local playerButtonConnections = {}
-local lastScanSignature = ""
 
-local function GetPlayerSignature()
-    local ids = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p \~= LocalPlayer then
-            table.insert(ids, tostring(p.UserId))
-        end
-    end
-    table.sort(ids)
-    return table.concat(ids, ",")
-end
-
-local function SyncPlayerListHighlight()
-    local targetName = Config.Target and Config.Target.Parent and Config.Target.Name or nil
-    for _, b in ipairs(PlayerListFrame:GetChildren()) do
-        if b:IsA("TextButton") then
-            if targetName and b.Text == targetName then
-                b.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-            else
-                b.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-            end
-        end
-    end
-end
-
-local function RefreshPlayers(force)
-    local sig = GetPlayerSignature()
-    if not force and sig == lastScanSignature then
-        SyncPlayerListHighlight()
-        return
-    end
-    lastScanSignature = sig
-
+local function RefreshPlayers()
     for _, conn in ipairs(playerButtonConnections) do
         if conn and conn.Connected then conn:Disconnect() end
     end
@@ -493,10 +419,10 @@ local function RefreshPlayers(force)
     end
     
     for _, p in ipairs(Players:GetPlayers()) do
-        if p \~= LocalPlayer then
+        if p ~= LocalPlayer then
             local pBtn = Instance.new("TextButton")
             pBtn.Size = UDim2.new(1, 0, 0, 30)
-            pBtn.BackgroundColor3 = (Config.Target == p) and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(40, 40, 45)
+            pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
             pBtn.Text = p.Name
             pBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             pBtn.Font = Enum.Font.GothamMedium
@@ -507,7 +433,7 @@ local function RefreshPlayers(force)
             local btnConn = pBtn.MouseButton1Click:Connect(function()
                 if Config.Target == p then 
                     Config.Target = nil 
-                    TargetLabel.Text = "Target: CHƯA CHỌN  |  Tự quét danh sách" 
+                    TargetLabel.Text = "Target: CHƯA CHỌN" 
                     TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80) 
                     pBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
                 else 
@@ -525,33 +451,8 @@ local function RefreshPlayers(force)
         end
     end
 end
-table.insert(connections, RefreshBtn.MouseButton1Click:Connect(function()
-    RefreshPlayers(true)
-end))
-RefreshPlayers(true)
-
-table.insert(connections, Players.PlayerAdded:Connect(function()
-    task.defer(function()
-        RefreshPlayers(true)
-    end)
-end))
-table.insert(connections, Players.PlayerRemoving:Connect(function(p)
-    if Config.Target == p then
-        Config.Target = nil
-        TargetLabel.Text = "Target: CHƯA CHỌN  |  Tự quét danh sách"
-        TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-    end
-    task.defer(function()
-        RefreshPlayers(true)
-    end)
-end))
-
-task.spawn(function()
-    while MaxuHub.Parent do
-        task.wait(1.5)
-        RefreshPlayers(false)
-    end
-end)
+table.insert(connections, RefreshBtn.MouseButton1Click:Connect(RefreshPlayers))
+RefreshPlayers()
 
 local function FindNewTarget()
     local closestPlayer = nil
@@ -561,7 +462,7 @@ local function FindNewTarget()
     if not hrp then return nil end
     
     for _, p in ipairs(Players:GetPlayers()) do
-        if p \~= LocalPlayer and p.Character then
+        if p ~= LocalPlayer and p.Character then
             local tHum = p.Character:FindFirstChildOfClass("Humanoid")
             local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
             if tHum and tHum.Health > 0 and tHrp then
@@ -591,6 +492,11 @@ table.insert(connections, RunService.Stepped:Connect(function()
     end
 end))
 
+-- ==========================================
+-- MAIN LOGIC LOOP 
+-- ==========================================
+local hasEscapedForLowHP = false
+
 table.insert(connections, RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
@@ -600,25 +506,22 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
     
     if not hum or not hrp or hum.Health <= 0 then 
         if hrp then hrp.Anchored = false end
-        if hasEscapedForLowHP then
-            hasEscapedForLowHP = false
-            ResumeTeleAfterEscape()
-        end
+        hasEscapedForLowHP = false
         return 
     end
     
-    if Config.WalkSpeedToggle and hum.WalkSpeed \~= Config.WalkSpeed then 
+    if Config.WalkSpeedToggle and hum.WalkSpeed ~= Config.WalkSpeed then 
         hum.WalkSpeed = Config.WalkSpeed 
     end
     
     local hpPercent = (hum.Health / hum.MaxHealth) * 100
     
+    -- XỬ LÝ KHI THẤP MÁU -> TELE ĐẾN DANH SÁCH PATH
     if Config.AutoEscape and hpPercent <= Config.EscapeHP then
         if not hasEscapedForLowHP then
             hasEscapedForLowHP = true
-            escapeTargetPos = SAFE_SPOT
-            PauseTeleForEscape()
         end
+        
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("BodyMover") or v:IsA("LinearVelocity") or v:IsA("VectorForce") or v:IsA("AlignPosition") then
                 v:Destroy()
@@ -628,7 +531,15 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         hrp.Anchored = true
         hrp.AssemblyLinearVelocity = Vector3.zero
         hrp.AssemblyAngularVelocity = Vector3.zero
-        char:PivotTo(CFrame.new(escapeTargetPos))
+        
+        -- Chuyển qua tọa độ tiếp theo trong bảng path
+        local targetVector = path[pathIndex]
+        char:PivotTo(CFrame.new(targetVector))
+        
+        pathIndex = pathIndex + 1
+        if pathIndex > #path then
+            pathIndex = 1
+        end
         return
     end
     
@@ -636,11 +547,15 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         if hpPercent >= (Config.EscapeHP + 15) then
             hasEscapedForLowHP = false
             hrp.Anchored = false
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
-            ResumeTeleAfterEscape()
         else
-            char:PivotTo(CFrame.new(escapeTargetPos))
+            local targetVector = path[pathIndex]
+            char:PivotTo(CFrame.new(targetVector))
+            
+            pathIndex = pathIndex + 1
+            if pathIndex > #path then
+                pathIndex = 1
+            end
+            
             hrp.AssemblyLinearVelocity = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
             return
@@ -656,21 +571,19 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
     end
     
     if targetInvalid then
-        local prev = Config.Target
         if Config.AutoSelect then
             Config.Target = FindNewTarget()
+            if Config.Target then
+                TargetLabel.Text = "Target: " .. Config.Target.Name
+                TargetLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+            else
+                TargetLabel.Text = "Target: CHƯA CHỌN"
+                TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            end
         else
             Config.Target = nil
-        end
-        if Config.Target then
-            TargetLabel.Text = "Target: " .. Config.Target.Name
-            TargetLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
-        else
-            TargetLabel.Text = "Target: CHƯA CHỌN  |  Tự quét danh sách"
+            TargetLabel.Text = "Target: CHƯA CHỌN"
             TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        end
-        if Config.Target \~= prev then
-            SyncPlayerListHighlight()
         end
     end
     
@@ -704,6 +617,7 @@ end))
 -- ==========================================
 -- SCRIPT PHẦN 2 (BYPASS, ANTI-MOVES, INVISIBILITY, ETC)
 -- ==========================================
+
 local TeleportService = game:GetService("TeleportService")
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -745,6 +659,7 @@ local _moveList = {
         { 'Carnage',                  13723174078,   25,   3, 'Carnage'                  },
         { 'Fourfold Flashstrike',     13881335713,   25,   4, 'Fourfold Flashstrike'     },
         { 'Homerun',                  14004235777,   17.5, 1, 'Homerun'                  },
+
         { 'Grand Slam',               14299135500,   20,   3, 'Grand Slam'               },
         { 'Foul Ball',                14351441234,   23,   4, 'Foul Ball'                },
         { 'Savage Tornado',           14719290328,   17,   1, 'Savage Tornado'           },
@@ -799,19 +714,21 @@ local _moveList = {
         { 'Hammer Heel',              135289891173395, 18, 3, 'Hammer Heel'              },
         { 'Machine Gun Blows',        12971270638,   15,   1, 'Machine Gun Blows'        },
         { 'Crushed Rock',             72451715583225, 9.58, 4, 'Crushed Rock'            },
+        -- Block animations (usados só para detectar 3x block toggle)
         { 'Block',                    13380778193,   0,    0, 'Block'                    },
         { 'Block',                    13370310513,   0,    0, 'Block'                    },
         { 'Block',                    13935548552,   0,    0, 'Block'                    },
+
     }
 
 local deathCounterActive     = true
 deathCounterConns = {}
 deathCounterDebounce = {}
 hookedChars = {}
-local _hookPlayerAntiMoves
-local _watchEnemyAntiMoves
-local _antiMovesCharConns
-local _antiMovesRespawnConns
+local _hookPlayerAntiMoves    -- forward-declared as upvalue to avoid local register overflow inside xpcall
+local _watchEnemyAntiMoves    -- forward-declared as upvalue to avoid local register overflow inside xpcall
+local _antiMovesCharConns     -- forward-declared as upvalue to avoid local register overflow inside xpcall
+local _antiMovesRespawnConns  -- forward-declared as upvalue to avoid local register overflow inside xpcall
 local isDeathCountered = false
 
 local function _getAntiDCWaitBeforeKill()
@@ -858,7 +775,7 @@ local function getDisplayName(player)
     local ok, displayName = pcall(function() return player.DisplayName end)
     if not ok or not displayName or displayName == "" then return player.Name end
     for _, p in pairs(Players:GetPlayers()) do
-        if p \~= player and p.DisplayName == displayName then
+        if p ~= player and p.DisplayName == displayName then
             return player.Name
         end
     end
@@ -884,7 +801,7 @@ local function _hookAntiDCAnimator(humanoid)
             local savedCFrame = root.CFrame
             local attacker = nil
             for _, player in pairs(Players:GetPlayers()) do
-                if player \~= lp then
+                if player ~= lp then
                     local tchar = player.Character
                     local troot = tchar and tchar:FindFirstChild("HumanoidRootPart")
                     local thum  = tchar and tchar:FindFirstChildOfClass("Humanoid")
@@ -1025,6 +942,7 @@ isCountering = function(hum)
     end
     return false
 end
+
 _watchEnemyAntiMoves = function(player, char)
     if not char then return end
     if _antiMovesCharConns[player] then
@@ -1096,7 +1014,7 @@ _watchEnemyAntiMoves = function(player, char)
                 return myRoot.Position
             end
             if animId:match("12983333733")
-                and char:GetAttribute("Ulted") \~= nil then
+                and char:GetAttribute("Ulted") ~= nil then
                 task.delay(1, function()
                     if char:FindFirstChild("AbsoluteImmortal", true) and char:FindFirstChild("Freeze") then
                         task.wait(4.25)
@@ -1110,7 +1028,7 @@ _watchEnemyAntiMoves = function(player, char)
                 end)
             end
             if animId:match("11365563255")
-                and char:GetAttribute("Ulted") \~= nil then
+                and char:GetAttribute("Ulted") ~= nil then
                 task.delay(1, function()
                     if char:FindFirstChild("AbsoluteImmortal", true) and char:FindFirstChild("Freeze") then
                         task.wait(3)
@@ -1122,7 +1040,7 @@ _watchEnemyAntiMoves = function(player, char)
                 end)
             end
             if animId:match("13927612951")
-                and char:GetAttribute("Ulted") \~= nil then
+                and char:GetAttribute("Ulted") ~= nil then
                 local startTickSaitama = tick()
                 safeDesyncLoop(function()
                     return (getMyPos() - enemyRoot.Position).Magnitude > 150
@@ -1779,7 +1697,7 @@ local function stopInvisibility()
         for _, _ic in pairs(_invisPartConns) do pcall(function() _ic:Disconnect() end) end
         _invisPartConns = {}
         for _, part in pairs(char:GetDescendants()) do
-            if part:IsA("BasePart") and part.Name \~= "HumanoidRootPart" then
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                 part.LocalTransparencyModifier = 0
             end
         end
@@ -1802,7 +1720,7 @@ local function _hookInvisPart(part)
     part.LocalTransparencyModifier = 0.5
     local conn = part:GetPropertyChangedSignal("LocalTransparencyModifier"):Connect(function()
         if not InvisibilityActive then return end
-        if part.LocalTransparencyModifier \~= 0.5 then
+        if part.LocalTransparencyModifier ~= 0.5 then
             part.LocalTransparencyModifier = 0.5
         end
     end)
@@ -1835,7 +1753,7 @@ end
 local _invisDesyncHeartbeatConn = RunService.Heartbeat:Connect(function()
     if not farmEnabled then return end
     if isUlting or isUsingTF then getgenv().desync = nil end
-    local hasDesync      = getgenv().desync \~= nil
+    local hasDesync      = getgenv().desync ~= nil
     if not InvisibilityActive and not hasDesync then return end
     if invisBusy then return end
     invisBusy = true
@@ -1876,7 +1794,7 @@ local _invisDesyncHeartbeatConn = RunService.Heartbeat:Connect(function()
     end
     local invisAnim = nil
     if InvisibilityActive then
-        if cachedAnimHumanoid \~= currentHumanoid then
+        if cachedAnimHumanoid ~= currentHumanoid then
             if cachedAnimTrack then 
                 pcall(function() 
                     if cachedAnimTrack.IsPlaying then cachedAnimTrack:Stop() end 
@@ -1941,7 +1859,7 @@ task.spawn(function()
         until (lp.Character == char)
             and char:FindFirstChild('HumanoidRootPart')
             and char:FindFirstChildOfClass('Humanoid')
-        if lp.Character \~= char then return end
+        if lp.Character ~= char then return end
         local root = char:FindFirstChild('HumanoidRootPart')
         task.spawn(function()
             while task.wait() and (not lp.Character or lp.Character == char) do
@@ -1983,7 +1901,7 @@ task.spawn(function()
         end)
         task.spawn(function()
             for _, part in pairs(char:GetDescendants()) do
-                if part:IsA('BasePart') and part \~= root and part.Transparency \~= 1
+                if part:IsA('BasePart') and part ~= root and part.Transparency ~= 1
                     and not part.Name:lower():find('hitbox') then
                     task.spawn(function()
                         while task.wait() and (not lp.Character or lp.Character == char) do
@@ -1993,7 +1911,7 @@ task.spawn(function()
                                     RunService.RenderStepped:Wait()
                                 until not InvisibilityActive
                                     and (not getgenv().desync or char:FindFirstChild('AbsoluteImmortal'))
-                                    or (lp.Character and lp.Character \~= char)
+                                    or (lp.Character and lp.Character ~= char)
                                 part.Transparency = 0
                             end
                         end
