@@ -324,7 +324,7 @@ local Config = {
     Target = nil,
     StickyTele = false,
     TeleDistance = 3, 
-    TeleSpeed = 20000, 
+    TeleSpeed = 300, 
     CharAim = false,
     AutoSelect = false,
     AntiFling = false,
@@ -357,7 +357,7 @@ CreateToggle("Bay Dí Sát / Bay Cực Nhanh", function(state) Config.StickyTele
 CreateToggle("Void Drag (CHỈ KHI DÙNG SKILL/M1)", function(state) Config.VoidDrag = state end)
 CreateToggle("Tự động chọn Target mới", function(state) Config.AutoSelect = state end)
 CreateSlider("Khoảng cách sau lưng", 1, 15, 3, function(val) Config.TeleDistance = val end)
-CreateSlider("Tốc độ bay Tele Kill", 1, 50000, 20000, function(val) Config.TeleSpeed = val end)
+CreateSlider("Tốc độ bay Velocity", 50, 2000, 300, function(val) Config.TeleSpeed = val end)
 CreateToggle("Aim Nhân Vật (Auto Face)", function(state) Config.CharAim = state end)
 CreateToggle("Chống Fling (Anti-Fling)", function(state) Config.AntiFling = state end)
 CreateToggle("Tự động tẩu thoát khi yếu máu", function(state) 
@@ -486,7 +486,7 @@ table.insert(connections, RunService.Stepped:Connect(function()
 end))
 
 -- ==========================================
--- MAIN LOGIC LOOP (ĐÃ FIX LỖI LÙ ĐÙ)
+-- MAIN LOGIC LOOP (ĐÃ ĐỔI SANG VELOCITY MƯỢT KHÔNG LÙ ĐÙ)
 -- ==========================================
 local hasEscapedForLowHP = false
 local escapeTargetPos = Vector3.new(-74.6, 84.0, 20352.1)
@@ -562,7 +562,7 @@ table.insert(connections, RunService.Heartbeat:Connect(function(deltaTime)
         local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
         
         if tHrp then
-            -- 1. LOGIC VỊ TRÍ FIX
+            -- 1. LOGIC VỊ TRÍ DÙNG VELOCITY (Không bao giờ bị lù đù)
             if Config.VoidDrag and isCastingSkill then
                 tHrp.CFrame = CFrame.new(tHrp.Position.X, -1000, tHrp.Position.Z)
                 tHrp.AssemblyLinearVelocity = Vector3.zero
@@ -574,33 +574,29 @@ table.insert(connections, RunService.Heartbeat:Connect(function(deltaTime)
                 
             elseif Config.StickyTele then
                 local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
+                local targetPos = targetBehindCFrame.Position
+                local currentPos = hrp.Position
+                local direction = (targetPos - currentPos)
+                local distance = direction.Magnitude
                 
-                if Config.TeleSpeed >= 45000 then
-                    -- Nếu max thanh kéo thì Snap tức thời (Instant)
-                    hrp.CFrame = targetBehindCFrame
+                if distance > 1 then
+                    -- Bơm trực tiếp vận tốc vật lý để bay thẳng đến mục tiêu cực mượt
+                    local speed = math.min(Config.TeleSpeed, distance * 60)
+                    hrp.AssemblyLinearVelocity = direction.Unit * speed
                 else
-                    -- Nếu dưới max, di chuyển với vận tốc thật theo Studs
-                    local currentPos = hrp.Position
-                    local targetPos = targetBehindCFrame.Position
-                    local distance = (targetPos - currentPos).Magnitude
-                    local moveAmount = Config.TeleSpeed * deltaTime
-                    
-                    if distance <= moveAmount or distance == 0 then
-                        hrp.CFrame = targetBehindCFrame
-                    else
-                        hrp.CFrame = hrp.CFrame:Lerp(targetBehindCFrame, moveAmount / distance)
-                    end
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.CFrame = targetBehindCFrame
                 end
                 
-                -- Hủy lực kéo để không giật cục
-                hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
+            else
+                hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
             end
             
             -- 2. LOGIC AIM
             if Config.CharAim then
                 hum.AutoRotate = false
-                local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHrp.Position.Z)
+                local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHpr.Position.Z)
                 hrp.CFrame = CFrame.lookAt(hrp.Position, lookVector)
             else
                 hum.AutoRotate = true
@@ -608,5 +604,6 @@ table.insert(connections, RunService.Heartbeat:Connect(function(deltaTime)
         end
     else
         if hum then hum.AutoRotate = true end
+        hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
     end
 end))
