@@ -485,7 +485,6 @@ table.insert(connections, RunService.Stepped:Connect(function()
         end
     end
 end))
-
 -- ==========================================
 -- MAIN LOGIC LOOP 
 -- ==========================================
@@ -511,31 +510,29 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
     
     local hpPercent = (hum.Health / hum.MaxHealth) * 100
     
-    -- Xử lý tự động tẩu thoát (Auto Escape)
+    -- Kích hoạt tẩu thoát khi yếu máu
     if Config.AutoEscape and hpPercent <= Config.EscapeHP then
         hasEscapedForLowHP = true
-        for _, v in ipairs(char:GetDescendants()) do
-            if v:IsA("BodyMover") or v:IsA("LinearVelocity") or v:IsA("VectorForce") or v:IsA("AlignPosition") then
-                v:Destroy()
-            end
-        end
-        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-        hrp.Anchored = true
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-        char:PivotTo(CFrame.new(escapeTargetPos))
-        return
     end
     
+    -- Xử lý vòng lặp tẩu thoát (Ghim chặt vị trí an toàn)
     if hasEscapedForLowHP then
         if hpPercent >= (Config.EscapeHP + 15) then
             hasEscapedForLowHP = false
             hrp.Anchored = false
         else
-            char:PivotTo(CFrame.new(escapeTargetPos))
+            -- Xóa các lực tác động có thể gây kẹt
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BodyMover") or v:IsA("LinearVelocity") or v:IsA("VectorForce") or v:IsA("AlignPosition") then
+                    v:Destroy()
+                end
+            end
+            -- Đưa vào trạng thái vô hiệu hóa vật lý và spam CFrame
+            hrp.Anchored = true
             hrp.AssemblyLinearVelocity = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
-            return
+            char:PivotTo(CFrame.new(escapeTargetPos))
+            return -- Dừng toàn bộ logic combat phía dưới khi đang bỏ trốn
         end
     end
 
@@ -562,6 +559,7 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
             TargetLabel.Text = "Target: CHƯA CHỌN"
             TargetLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
         end
+        hum.AutoRotate = true -- Trả lại khả năng xoay mặt khi mất target
     end
     
     -- Logic Combat / Bám theo Target
@@ -569,6 +567,7 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
         
         if tHrp then
+            -- 1. LOGIC VỊ TRÍ (Position)
             if Config.VoidDrag and isCastingSkill then
                 tHrp.CFrame = CFrame.new(tHrp.Position.X, -1000, tHrp.Position.Z)
                 tHrp.AssemblyLinearVelocity = Vector3.zero
@@ -579,18 +578,24 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
                 hrp.AssemblyAngularVelocity = Vector3.zero
                 
             elseif Config.StickyTele then
-                -- Bay bám cực nhanh bằng Lerp nhưng không gây xung đột dịch chuyển
                 local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
                 hrp.CFrame = hrp.CFrame:Lerp(targetBehindCFrame, 0.4)
                 
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
-                
-            elseif Config.CharAim then
+            end
+            
+            -- 2. LOGIC AIM (Độc lập, hoạt động chung được với Tele)
+            if Config.CharAim then
+                hum.AutoRotate = false -- Tắt tự động xoay của Roblox để không bị lệch Aim
                 local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHrp.Position.Z)
                 hrp.CFrame = CFrame.lookAt(hrp.Position, lookVector)
+            else
+                hum.AutoRotate = true
             end
         end
+    else
+        if hum then hum.AutoRotate = true end
     end
 end))
 
