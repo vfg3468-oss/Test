@@ -1,5 +1,5 @@
 -- ==========================================
--- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V32 - INSTANT SNAP C-FRAME)
+-- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V33 - CFRAME POSITION LOCK)
 -- ==========================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -102,7 +102,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(0, 300, 1, 0)
 TitleText.Position = UDim2.new(0, 15, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Maxu Hub Premium [ TSB Main V32 ]"
+TitleText.Text = "Maxu Hub Premium [ TSB Main V33 - Position Lock ]"
 TitleText.TextColor3 = Color3.fromRGB(200, 200, 200)
 TitleText.Font = Enum.Font.GothamMedium
 TitleText.TextSize = 14
@@ -333,10 +333,9 @@ local Config = {
 }
 
 CreateHeader("Combat Pro")
-CreateToggle("Bay Dí Sát Trực Tiếp (Mới)", function(state) Config.StickyTele = state end)
+CreateToggle("Position Lock (Ép Vị Trí)", function(state) Config.StickyTele = state end)
 CreateToggle("Tự động chọn Target mới", function(state) Config.AutoSelect = state end)
 CreateSlider("Khoảng cách sau lưng", 1, 15, 3, function(val) Config.TeleDistance = val end)
--- Đã xóa thanh trượt tốc độ (TeleSpeed) vì giờ đã dịch chuyển tức thời không giới hạn tốc độ.
 CreateToggle("Aim Nhân Vật (Auto Face)", function(state) Config.CharAim = state end)
 CreateToggle("Tự động tẩu thoát khi yếu máu", function(state) 
     Config.AutoEscape = state 
@@ -449,7 +448,7 @@ local function FindNewTarget()
 end
 
 -- ==========================================
--- MAIN LOGIC LOOP (INSTANT C-FRAME SNAP)
+-- MAIN LOGIC LOOP (CFRAME-BASED POSITION TRACKING)
 -- ==========================================
 local hasEscapedForLowHP = false
 local escapeTargetPos = Vector3.new(-74.6, 84.0, 20352.1)
@@ -525,27 +524,27 @@ table.insert(connections, RunService.Heartbeat:Connect(function()
         local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
         
         if tHrp then
-            -- LOGIC BAY TỨC THỜI (Không dùng vận tốc đuổi theo)
+            -- LOGIC POSITION LOCK (Ép chặt vị trí bằng CFrame)
             if Config.StickyTele then
-                -- Lấy trực tiếp tọa độ đằng sau mục tiêu
-                local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
+                -- Tính toán Lock Position dựa trên Position của mục tiêu và khoảng cách
+                local lockPos = tHrp.Position - (tHrp.CFrame.LookVector * Config.TeleDistance)
                 
                 if Config.CharAim then
                     hum.AutoRotate = false
-                    -- Set CFrame thẳng vào vị trí đằng sau và nhìn thẳng vào mục tiêu
-                    hrp.CFrame = CFrame.lookAt(targetBehindCFrame.Position, Vector3.new(tHrp.Position.X, targetBehindCFrame.Position.Y, tHrp.Position.Z))
+                    -- Set CFrame tại LockPos và khóa mắt nhìn thẳng vào mục tiêu
+                    hrp.CFrame = CFrame.new(lockPos, Vector3.new(tHrp.Position.X, lockPos.Y, tHrp.Position.Z))
                 else
                     hum.AutoRotate = true
-                    -- Snap tức thời vào vị trí
-                    hrp.CFrame = targetBehindCFrame
+                    -- Giữ nguyên Rotation hiện tại của nhân vật, chỉ ép Position
+                    hrp.CFrame = CFrame.new(lockPos) * hrp.CFrame.Rotation
                 end
                 
-                -- Triệt tiêu hoàn toàn trọng lực và lực quán tính để tránh bị trượt/kẹt
+                -- Khóa cứng lực tác động vật lý để nhân vật không bị trôi
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
                 
             else
-                -- Chỉ dùng Aim nếu StickyTele tắt
+                -- Chỉ dùng Aim nếu Position Lock tắt
                 if Config.CharAim then
                     hum.AutoRotate = false
                     local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHrp.Position.Z)
