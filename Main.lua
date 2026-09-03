@@ -1,5 +1,5 @@
 -- ==========================================
--- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V30 - SMART VOID DRAG)
+-- MAXU HUB PREMIUM - [ TSB MAIN ] (ULTIMATE V31 - C FRAME FAST DRAG)
 -- ==========================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -102,7 +102,7 @@ local TitleText = Instance.new("TextLabel")
 TitleText.Size = UDim2.new(0, 300, 1, 0)
 TitleText.Position = UDim2.new(0, 15, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "Maxu Hub Premium [ TSB Main V30 ]"
+TitleText.Text = "Maxu Hub Premium [ TSB Main V31 ]"
 TitleText.TextColor3 = Color3.fromRGB(200, 200, 200)
 TitleText.Font = Enum.Font.GothamMedium
 TitleText.TextSize = 14
@@ -327,39 +327,18 @@ local Config = {
     TeleSpeed = 300, 
     CharAim = false,
     AutoSelect = false,
-    AntiFling = false,
     WalkSpeed = 16,
     WalkSpeedToggle = false,
     AutoEscape = false,
-    EscapeHP = 35,
-    VoidDrag = false
+    EscapeHP = 35
 }
-
-local isCastingSkill = false
-table.insert(connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or
-       input.KeyCode == Enum.KeyCode.One or
-       input.KeyCode == Enum.KeyCode.Two or
-       input.KeyCode == Enum.KeyCode.Three or
-       input.KeyCode == Enum.KeyCode.Four then
-       
-        isCastingSkill = true
-        task.delay(1.5, function()
-            isCastingSkill = false
-        end)
-    end
-end))
 
 CreateHeader("Combat Pro")
 CreateToggle("Bay Dí Sát / Bay Cực Nhanh", function(state) Config.StickyTele = state end)
-CreateToggle("Void Drag (CHỈ KHI DÙNG SKILL/M1)", function(state) Config.VoidDrag = state end)
 CreateToggle("Tự động chọn Target mới", function(state) Config.AutoSelect = state end)
 CreateSlider("Khoảng cách sau lưng", 1, 15, 3, function(val) Config.TeleDistance = val end)
-CreateSlider("Tốc độ bay Velocity", 50, 2000, 300, function(val) Config.TeleSpeed = val end)
+CreateSlider("Tốc độ bay (Studs/s)", 50, 2000, 300, function(val) Config.TeleSpeed = val end)
 CreateToggle("Aim Nhân Vật (Auto Face)", function(state) Config.CharAim = state end)
-CreateToggle("Chống Fling (Anti-Fling)", function(state) Config.AntiFling = state end)
 CreateToggle("Tự động tẩu thoát khi yếu máu", function(state) 
     Config.AutoEscape = state 
     if not state and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -470,23 +449,8 @@ local function FindNewTarget()
     return closestPlayer
 end
 
-table.insert(connections, RunService.Stepped:Connect(function()
-    if Config.AntiFling then
-        local char = LocalPlayer.Character
-        if char then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp and not hrp.Anchored then
-                if hrp.AssemblyLinearVelocity.Magnitude > 300 or hrp.AssemblyAngularVelocity.Magnitude > 300 then
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                end
-            end
-        end
-    end
-end))
-
 -- ==========================================
--- MAIN LOGIC LOOP (ĐÃ ĐỔI SANG VELOCITY MƯỢT KHÔNG LÙ ĐÙ)
+-- MAIN LOGIC LOOP (ĐÃ ĐỔI SANG CFRAME ĐỂ BAY NHANH, BỎ LÙ ĐÙ)
 -- ==========================================
 local hasEscapedForLowHP = false
 local escapeTargetPos = Vector3.new(-74.6, 84.0, 20352.1)
@@ -562,48 +526,49 @@ table.insert(connections, RunService.Heartbeat:Connect(function(deltaTime)
         local tHrp = Config.Target.Character:FindFirstChild("HumanoidRootPart")
         
         if tHrp then
-            -- 1. LOGIC VỊ TRÍ DÙNG VELOCITY (Không bao giờ bị lù đù)
-            if Config.VoidDrag and isCastingSkill then
-                tHrp.CFrame = CFrame.new(tHrp.Position.X, -1000, tHrp.Position.Z)
-                tHrp.AssemblyLinearVelocity = Vector3.zero
-                
-                local safeY = math.max(hrp.Position.Y, 15)
-                hrp.CFrame = CFrame.new(tHrp.Position.X, safeY, tHrp.Position.Z)
-                hrp.AssemblyLinearVelocity = Vector3.zero
-                hrp.AssemblyAngularVelocity = Vector3.zero
-                
-            elseif Config.StickyTele then
+            -- LOGIC C-FRAME: Tịnh tiến thẳng, bỏ qua lực cản vật lý
+            if Config.StickyTele then
                 local targetBehindCFrame = tHrp.CFrame * CFrame.new(0, 0, Config.TeleDistance)
-                local targetPos = targetBehindCFrame.Position
                 local currentPos = hrp.Position
+                local targetPos = targetBehindCFrame.Position
                 local direction = (targetPos - currentPos)
                 local distance = direction.Magnitude
                 
+                local newPos = currentPos
+                
                 if distance > 1 then
-                    -- Bơm trực tiếp vận tốc vật lý để bay thẳng đến mục tiêu cực mượt
-                    local speed = math.min(Config.TeleSpeed, distance * 60)
-                    hrp.AssemblyLinearVelocity = direction.Unit * speed
+                    -- Bơm thẳng vào CFrame thay vì dùng Velocity, bay thần tốc tùy vào TeleSpeed
+                    local step = math.min(Config.TeleSpeed * deltaTime, distance)
+                    newPos = currentPos + direction.Unit * step
                 else
-                    hrp.AssemblyLinearVelocity = Vector3.zero
-                    hrp.CFrame = targetBehindCFrame
+                    newPos = targetPos
                 end
                 
+                if Config.CharAim then
+                    hum.AutoRotate = false
+                    local lookVector = Vector3.new(tHrp.Position.X, newPos.Y, tHrp.Position.Z)
+                    hrp.CFrame = CFrame.lookAt(newPos, lookVector)
+                else
+                    hum.AutoRotate = true
+                    hrp.CFrame = CFrame.new(newPos) * hrp.CFrame.Rotation
+                end
+                
+                -- Hủy gia tốc vật lý sinh ra do rơi tự do để tránh kẹt đất
+                hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.AssemblyAngularVelocity = Vector3.zero
+                
             else
-                hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
-            end
-            
-            -- 2. LOGIC AIM
-            if Config.CharAim then
-                hum.AutoRotate = false
-                local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHpr.Position.Z)
-                hrp.CFrame = CFrame.lookAt(hrp.Position, lookVector)
-            else
-                hum.AutoRotate = true
+                -- Chỉ dùng Aim nếu StickyTele tắt
+                if Config.CharAim then
+                    hum.AutoRotate = false
+                    local lookVector = Vector3.new(tHrp.Position.X, hrp.Position.Y, tHrp.Position.Z)
+                    hrp.CFrame = CFrame.lookAt(hrp.Position, lookVector)
+                else
+                    hum.AutoRotate = true
+                end
             end
         end
     else
         if hum then hum.AutoRotate = true end
-        hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 0, hrp.AssemblyLinearVelocity.Z)
     end
 end))
